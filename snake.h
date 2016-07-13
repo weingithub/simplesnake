@@ -39,7 +39,11 @@ public:
     
     int CheckCollide();
     
-    int AddSnakeBody();   //增加蛇的蛇身  
+    int EatFood();   //吃食物
+     
+    int PrintCalcuteInfo();
+    
+    int PrintImportInfo(const char * msg);   //打印重要的信息。比如升级、撞墙、自杀等信息
     
     int SetDiresction(uint8_t udir);
     
@@ -56,6 +60,7 @@ private:
 
     int CreateFood();
     
+    int ClearPrint(uint32_t x, uint32_t y, uint32_t len);
 private:
     uint8_t  m_direction;
     uint32_t m_left;
@@ -66,6 +71,17 @@ private:
     //TPos    m_lastPos;
     TPos      m_foodPos;   //先假设只有一个食物
     TPos      m_lastPos;   //上次消失的节点
+    
+    uint32_t  m_speed;   //移动速度
+    
+    TPos      m_scorePos;  
+    TPos      m_levelPos;
+    TPos      m_NextPos;   //记录下次过关所需分数
+    
+    uint32_t  m_score;
+    uint32_t  m_level;
+    uint32_t  m_exp;  //每个食物代表的分数
+    
     std::list<TPos>  m_snakebody;
 };
 

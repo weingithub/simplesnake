@@ -9,10 +9,23 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 
+const int MAX_LEVEL = 10;
+
+const int NeedScore[MAX_LEVEL] = {0, 100, 300, 600, 1000, 2000, 4000, 7000, 11000, 16000}; 
+const int SpeedUp[MAX_LEVEL] = {0, 45, 37, 33, 30, 25, 20, 18, 15, 10}; 
 
 using namespace std;
 
-CSimpleSnake::CSimpleSnake():m_direction(DIRECTION_RIGHT),m_left(1),m_right(1),m_up(1),m_down(1)
+CSimpleSnake::CSimpleSnake():
+    m_direction(DIRECTION_RIGHT),
+    m_left(1),
+    m_right(1),
+    m_up(1),
+    m_down(1), 
+    m_speed(1),
+    m_score(0),
+    m_level(1),
+    m_exp(50)
 {
     
 }
@@ -31,37 +44,31 @@ int CSimpleSnake::Init(uint32_t x, uint32_t y)
     m_down = y;
    
    
-    GetTerminalSize();
+    GetTerminalSize();  //可能会修改m_right和m_down的值
 
     DrawBox(' ');
     
-    /*
-    m_lastPos.x = m_left + 1;
-    m_lastPos.y = m_up + 1;
+    //设置分数和等级等的打印位置信息
+    m_scorePos.x = m_right + 2;
+    m_scorePos.y = m_down /2;    
     
-    */
+    m_levelPos.x = m_scorePos.x;
+    m_levelPos.y = m_scorePos.y + 1;  
+
+    m_NextPos.x = m_scorePos.x;
+    m_NextPos.y = m_scorePos.y + 2;
     
     CreateFood();
     
     TPos snake;
     
-    //测试，假设蛇的长度是3
+    //初始化，只设置蛇头一个
     snake.x = m_left + 1;
     snake.y = m_up + 1;
     
     m_snakebody.push_back(snake);
-    
-    snake.x += 1;
-    m_snakebody.push_back(snake);
-    
-    snake.x += 1;
-    m_snakebody.push_back(snake);
-    
-    snake.x += 1;
-    m_snakebody.push_back(snake);
-    
-    //DrawSnake();
-    
+
+    PrintCalcuteInfo();
     
     return 0;
 }
@@ -142,7 +149,6 @@ int CSimpleSnake::Run()
     HIDE_CURSOR();
     
     //让蛇跑起来
-    int times = 0;
     int ret = 0;
     
     //设置定时信号
@@ -167,26 +173,21 @@ int CSimpleSnake::Run()
 	}	
     
     //sleep(1);
+    uint32_t times = 0;
     
     while(true)
     {
-        if (times > 1000)
-        {
-            break;
-        }
-        
+        times = SpeedUp[m_level];
+
         ret = Move();
         
         if (ret)
         {
             break;
         }
-        //break;
         
-        ++times;
-        
-        usleep(1000*300);
-        //sleep(1);
+        //速度的提升，体现在刷新的间隔时间变少
+        usleep(1000*10*times);
     }
     
     GameEnd();
@@ -199,16 +200,10 @@ int CSimpleSnake::Move()
     //实现移动的效果，就是不断的重绘
     
     //先清除旧的位置，再打印新的位置
-    /*
-    MOVETO(m_lastPos.x +1, m_lastPos.y);
-    cout<<"\b "<<flush;
-    */
+
     ClearSnake();
     SwapSnake();
     
-    //设置每次循环移动2
-    uint32_t speed = 1;
-
     //修改尾部指针的坐标即可
     
     list<TPos>::reverse_iterator riter = m_snakebody.rbegin();
@@ -217,10 +212,10 @@ int CSimpleSnake::Move()
     
     switch(m_direction)
     {
-        case DIRECTION_RIGHT: changepos.x += speed; break;
-        case DIRECTION_LEFT: changepos.x -= speed; break;
-        case DIRECTION_UP: changepos.y -= speed; break;
-        case DIRECTION_DOWN: changepos.y += speed; break;
+        case DIRECTION_RIGHT: changepos.x += m_speed; break;
+        case DIRECTION_LEFT: changepos.x -= m_speed; break;
+        case DIRECTION_UP: changepos.y -= m_speed; break;
+        case DIRECTION_DOWN: changepos.y += m_speed; break;
     }
 
     int ret = CheckCollide();
@@ -232,8 +227,13 @@ int CSimpleSnake::Move()
     }
     else if (2 == ret)   //吃到食物
     {
-        AddSnakeBody();
-        CreateFood();
+        int res = EatFood();   //是否达到最大级数
+        
+        if (res)
+        {
+            return res;
+        }
+        
     }
     
     DrawSnake();
@@ -241,16 +241,112 @@ int CSimpleSnake::Move()
     return 0;
 }
 
-int CSimpleSnake::AddSnakeBody()
+int CSimpleSnake::PrintCalcuteInfo()
 {
-    m_snakebody.push_front(m_lastPos);  //新节点插入头部
+    MOVETO(m_scorePos.x, m_scorePos.y);
+    
+    cout<<"分数："<<m_score<<flush;
+    
+    MOVETO(m_levelPos.x, m_levelPos.y);
+    
+    cout<<"等级："<<m_level<<flush;
+    
+    MOVETO(m_NextPos.x, m_NextPos.y);
+    
+    cout<<"下一关分数："<<NeedScore[m_level]<<flush;
+}
+
+int CSimpleSnake::ClearPrint(uint32_t x, uint32_t y, uint32_t len)
+{
+    for(int i = 0; i < len ; ++i)
+    {
+        MOVETO(x + i, y);  //暂时只支持行删除
+        cout<<" "<<flush;
+    }
     
     return 0;
 }
 
+int CSimpleSnake::EatFood()
+{
+    //先将当前的食物消除
+    ClearPrint(m_foodPos.x, m_foodPos.y, 1);
+    
+    m_snakebody.push_front(m_lastPos);  //新节点插入头部
+    
+    //修改分数，以及设置过关等级
+    //设置每个食物加50分
+    
+    m_score += m_exp;
+    
+    //判断是否晋级
+    if (m_score >= NeedScore[m_level])
+    {
+        m_level += 1;
+        PrintImportInfo("Level UP");   
+        
+        if (MAX_LEVEL <= m_level)
+        {
+            PrintImportInfo("LEVEL IS MAX");    
+            return 1;
+        }
+    }
+    
+    PrintCalcuteInfo();
+    
+    CreateFood();
+    
+    return 0;
+}
+
+int CSimpleSnake::PrintImportInfo(const char * msg)
+{
+    MOVETO(m_right/2 - 3, m_down/2);
+    printf("\033[31m%s\033[5m", msg);
+    
+    printf("\033[0m");
+    cout<<flush;
+    
+    sleep(3);
+    
+    //怎么删除这行的打印信息呢??
+    int len = strlen(msg);
+    
+    ClearPrint(m_right/2 - 3, m_down/2, len);
+    
+    return 0;
+}
+
+int CSimpleSnake::GetTerminalSize()
+{
+    struct winsize size;
+    
+    ioctl(STDIN_FILENO,TIOCGWINSZ,&size);
+    printf("%d\n",size.ws_col);
+    printf("%d\n",size.ws_row);
+    
+    uint32_t info_size = 10;  //用于打印分数和等级信息
+    
+    //当横轴大于终端的列值时，取终端列值
+    if (m_right > size.ws_col - info_size)
+    {
+        m_right = size.ws_col - info_size;
+    }
+    
+    //当纵轴大于等于终端的行值时，取终端行值-1
+    if (m_down > size.ws_row - info_size)
+    {
+        m_down = size.ws_row - info_size;
+    }
+    
+    
+    return 0;
+}
 
 int CSimpleSnake::DrawSnake()
 {
+    //打印之前，清除一些提示
+    
     //先打印蛇身，再打印蛇头。不然的话，当自身相撞时，蛇头的打印会被蛇身覆盖掉
     unsigned snake_size = m_snakebody.size();
     unsigned count = 0;
@@ -296,6 +392,11 @@ int CSimpleSnake::CreateFood()
         if (0 != CheckPosExist(random_x, random_y))
         {
             continue;
+        }
+        
+        if (m_foodPos.x == random_x && m_foodPos.y == random_y)  //预防当前食物节点出现在上次相同的地方
+        {
+            continue; 
         }
         
         //打印食物
@@ -422,10 +523,6 @@ void * CSimpleSnake::ListenKeybordThread(void * vpParam)
     {
         int nread;
         
-        //char buf[3];
-        
-        //cout<<"开始"<<endl;
-        
         ch = readch();
         
         uint8_t dire = 0;
@@ -450,30 +547,6 @@ void * CSimpleSnake::ListenKeybordThread(void * vpParam)
     
     return (void *)0;
 }
-
-int CSimpleSnake::GetTerminalSize()
-{
-    struct winsize size;
-    
-    ioctl(STDIN_FILENO,TIOCGWINSZ,&size);
-    printf("%d\n",size.ws_col);
-    printf("%d\n",size.ws_row);
-    
-    //当横轴大于终端的列值时，取终端列值
-    if (m_right > size.ws_col)
-    {
-        m_right = size.ws_col;
-    }
-    
-    //当纵轴大于等于终端的行值时，取终端行值-1
-    if (m_down > size.ws_row)
-    {
-        m_down = size.ws_row - 1;
-    }
-    
-    return 0;
-}
-
 
 int StringToUInt(const char * ptr, uint32_t & result)
 {
