@@ -1,5 +1,6 @@
 #include "snake.h"
 #include "kbinit.h"
+#include "common.h"
 
 #include <iostream>
 #include <cstdio>
@@ -40,24 +41,26 @@ int CSimpleSnake::Init(uint32_t x, uint32_t y)
     
     */
     
+    CreateFood();
+    
     TPos snake;
     
     //测试，假设蛇的长度是3
     snake.x = m_left + 1;
     snake.y = m_up + 1;
     
-    m_snakebody.push_front(snake);
+    m_snakebody.push_back(snake);
     
     snake.x += 1;
-    m_snakebody.push_front(snake);
+    m_snakebody.push_back(snake);
     
     snake.x += 1;
-    m_snakebody.push_front(snake);
+    m_snakebody.push_back(snake);
     
     snake.x += 1;
-    m_snakebody.push_front(snake);
+    m_snakebody.push_back(snake);
     
-    DrawSnake();
+    //DrawSnake();
     
     
     return 0;
@@ -222,9 +225,15 @@ int CSimpleSnake::Move()
 
     int ret = CheckCollide();
     
-    if (ret)
+    if (1 == ret)
     {
+        DrawSnake();  //打印临时的场景
         return ret;
+    }
+    else if (2 == ret)   //吃到食物
+    {
+        AddSnakeBody();
+        CreateFood();
     }
     
     DrawSnake();
@@ -232,37 +241,111 @@ int CSimpleSnake::Move()
     return 0;
 }
 
+int CSimpleSnake::AddSnakeBody()
+{
+    m_snakebody.push_front(m_lastPos);  //新节点插入头部
+    
+    return 0;
+}
+
 
 int CSimpleSnake::DrawSnake()
 {
-    /*
-    MOVETO(m_lastPos.x, m_lastPos.y);
-        
-    char c = 4;
-    printf("\033[41;34m%c\033[0m", c);
-    
-    cout<<flush;
-    */
-    
-    char c = 4;
+    //先打印蛇身，再打印蛇头。不然的话，当自身相撞时，蛇头的打印会被蛇身覆盖掉
+    unsigned snake_size = m_snakebody.size();
+    unsigned count = 0;
+    char d = 79;
     
     for(list<TPos>::iterator titer = m_snakebody.begin(); titer != m_snakebody.end(); ++titer)
     {
+        ++count;
+        
+        if (count >= snake_size)
+        {
+            break;
+        }
+     
         MOVETO(titer->x, titer->y);
-        printf("\033[41;34m%c\033[0m", c);
+        
+        cout<<d<<flush;
+    }
     
+    //打印蛇头    
+    char c = ' ';
+    list<TPos>::reverse_iterator riter = m_snakebody.rbegin();
+    
+    //设置蛇头红色
+        
+    MOVETO(riter->x, riter->y);
+    printf("\033[41;34m%c\033[0m", c);
+    cout<<flush;
+
+    return 0;
+}
+
+int CSimpleSnake::CreateFood()
+{
+    char ch = ' ';
+    
+    while(true)
+    {
+        int random_x = Common::GetRandomValue(m_right);
+        int random_y = Common::GetRandomValue(m_down);
+        
+        //判断x,y是否已经存在物体，如蛇或者墙壁
+        if (0 != CheckPosExist(random_x, random_y))
+        {
+            continue;
+        }
+        
+        //打印食物
+        MOVETO(random_x, random_y);
+        
+        printf("\033[42;32m%c\033[0m", ch);
         cout<<flush;
+        
+        m_foodPos.x = random_x;
+        m_foodPos.y = random_y;
+        
+        break;
     }
     
     return 0;
 }
 
+int CSimpleSnake::CheckPosExist(uint32_t x, uint32_t y)
+{
+    //先判断是否在墙上
+    if (x >= m_right || x  <= m_left || y <= m_up || y >= m_down)  //
+    {
+        return -1;
+    }
+    
+    //判断是否在蛇身上
+    //循环蛇的所有坐标
+    int match = 0;
+    
+    for(list<TPos>::iterator titer = m_snakebody.begin(); titer != m_snakebody.end(); ++titer)
+    {
+        if (x == titer->x && y == titer->y)
+        {
+            ++match;
+        }
+    }
+    
+    return match;
+}
+
 int CSimpleSnake::SwapSnake()
 {
+    //交换蛇的坐标值，像海浪一样，后浪把值给前浪。
     //交换链表的值
     list<TPos>::iterator lastiter = m_snakebody.begin();
     list<TPos>::iterator titer = m_snakebody.begin();
     ++titer;
+    
+    m_lastPos.x = lastiter->x;
+    m_lastPos.y = lastiter->y;
     
     for(; titer != m_snakebody.end(); ++titer)
     {
@@ -286,13 +369,22 @@ int CSimpleSnake::ClearSnake()
 
 int CSimpleSnake::CheckCollide()
 {   
+    //检查碰撞，暂时只是判断了是否撞墙
     list<TPos>::reverse_iterator riter = m_snakebody.rbegin();
     
     TPos & lastpos = *riter;
+   
+    int ret = CheckPosExist(lastpos.x, lastpos.y);
     
-    if (lastpos.x >= m_right || lastpos.x  <= m_left || lastpos.y <= m_up || lastpos.y >= m_down)  //
+    if (-1 == ret || ret >= 2)  //-1时是撞墙，大于2时是撞自身
     {
         return 1;
+    }
+    
+    //判断是否撞到食物
+    if (m_foodPos.x == lastpos.x && m_foodPos.y == lastpos.y)
+    {
+        return 2;
     }
     
     return 0;

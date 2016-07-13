@@ -39,6 +39,8 @@ public:
     
     int CheckCollide();
     
+    int AddSnakeBody();   //增加蛇的蛇身  
+    
     int SetDiresction(uint8_t udir);
     
     int GameEnd();
@@ -50,6 +52,10 @@ private:
     
     int SwapSnake();
     
+    int CheckPosExist(uint32_t x, uint32_t y);
+
+    int CreateFood();
+    
 private:
     uint8_t  m_direction;
     uint32_t m_left;
@@ -58,8 +64,9 @@ private:
     uint32_t m_down;
     
     //TPos    m_lastPos;
-    
-    std::list<TPos> m_snakebody;
+    TPos      m_foodPos;   //先假设只有一个食物
+    TPos      m_lastPos;   //上次消失的节点
+    std::list<TPos>  m_snakebody;
 };
 
 #endif //_SIMPLE_SNAKE_H
