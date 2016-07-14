@@ -506,6 +506,8 @@ int CSimpleSnake::SetDiresction(uint8_t udir)
      
     m_direction = udir;
     
+
+
     return 0;
 }
 
