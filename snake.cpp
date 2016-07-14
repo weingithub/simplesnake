@@ -13,6 +13,7 @@ const int MAX_LEVEL = 10;
 
 const int NeedScore[MAX_LEVEL] = {0, 100, 300, 600, 1000, 2000, 4000, 7000, 11000, 16000}; 
 const int SpeedUp[MAX_LEVEL] = {0, 45, 37, 33, 30, 25, 20, 18, 15, 10}; 
+const int DirectionCompare[4] = {0, 0, 1, 1};  //右左上下，判断是否在同一个方向。值相同，则方向相同
 
 using namespace std;
 
@@ -493,6 +494,16 @@ int CSimpleSnake::CheckCollide()
 
 int CSimpleSnake::SetDiresction(uint8_t udir)
 {
+    //设置同一方向上的则不生效，比如已经向右运动，则向左向右均无效
+    // 1 == 2   3 == 4   //==表示同方向 
+    //const int DirectionCompare[4] = {0, 0, 1, 1};  //右左上下，判断是否在同一个方向。值相同，则方向相同
+    
+    if (DirectionCompare[udir - 1] == DirectionCompare[m_direction - 1])  //方向相同，不生效
+    {
+        cout<<"\a\b"<<flush;
+        return 1;    
+    }        
+     
     m_direction = udir;
     
     return 0;
@@ -506,6 +517,7 @@ int CSimpleSnake::GameEnd()
 
     //主进程死亡时，子线程自然死亡
     cout<<"Game Over"<<endl;
+    
     
     close_keyboard();
     exit(0);
