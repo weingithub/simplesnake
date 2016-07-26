@@ -26,7 +26,8 @@ CSimpleSnake::CSimpleSnake():
     m_speed(1),
     m_score(0),
     m_level(1),
-    m_exp(50)
+    m_exp(50),
+    m_isAllowChange(true)
 {
     
 }
@@ -58,6 +59,10 @@ int CSimpleSnake::Init(uint32_t x, uint32_t y)
 
     m_NextPos.x = m_scorePos.x;
     m_NextPos.y = m_scorePos.y + 2;
+    
+    m_DebugPos.x = m_scorePos.x;
+    m_DebugPos.y = m_scorePos.y + 4;
+    
     
     CreateFood();
     
@@ -198,6 +203,7 @@ int CSimpleSnake::Run()
 
 int CSimpleSnake::Move()
 {
+    system("echo Move >> debug_log");
     //实现移动的效果，就是不断的重绘
     
     //先清除旧的位置，再打印新的位置
@@ -238,6 +244,7 @@ int CSimpleSnake::Move()
     }
     
     DrawSnake();
+    m_isAllowChange = true;
     
     return 0;
 }
@@ -270,6 +277,7 @@ int CSimpleSnake::ClearPrint(uint32_t x, uint32_t y, uint32_t len)
 
 int CSimpleSnake::EatFood()
 {
+    system("echo EatFood >> debug_log");
     //先将当前的食物消除
     ClearPrint(m_foodPos.x, m_foodPos.y, 1);
     
@@ -346,6 +354,7 @@ int CSimpleSnake::GetTerminalSize()
 
 int CSimpleSnake::DrawSnake()
 {
+    system("echo DrawSnake >> debug_log");
     //打印之前，清除一些提示
     
     //先打印蛇身，再打印蛇头。不然的话，当自身相撞时，蛇头的打印会被蛇身覆盖掉
@@ -382,6 +391,7 @@ int CSimpleSnake::DrawSnake()
 
 int CSimpleSnake::CreateFood()
 {
+    system("echo CreateFood >> debug_log");
     char ch = ' ';
     
     while(true)
@@ -401,8 +411,18 @@ int CSimpleSnake::CreateFood()
         }
         
         //打印食物
-        MOVETO(random_x, random_y);
+        #ifdef DEBUG        
+        char msg[100] = {0};
+        sprintf(msg, "echo %u %u >> food.pos", random_x, random_y);
+        system(msg);
         
+        MOVETO(m_DebugPos.x, m_DebugPos.y);
+        cout<<"食物位置:"<<random_x<<","<<random_y<<"    "<<flush;
+
+        
+        #endif
+        MOVETO(random_x, random_y);
+
         printf("\033[42;32m%c\033[0m", ch);
         cout<<flush;
         
@@ -504,9 +524,18 @@ int CSimpleSnake::SetDiresction(uint8_t udir)
         return 1;    
     }        
      
-    m_direction = udir;
+    //怎么才能立即生效?信号处理? 
     
-
+    
+    while(true)
+    {
+        if (m_isAllowChange)
+        {
+            m_direction = udir;
+            m_isAllowChange = false;
+            break;
+        }
+    }
 
     return 0;
 }
@@ -555,6 +584,7 @@ void * CSimpleSnake::ListenKeybordThread(void * vpParam)
         if (dire != 0)
         {
             psnake->SetDiresction(dire);
+            //怎么让方向改变后，立即生效?
         }
         
     }
@@ -595,6 +625,11 @@ int main(int argc, char **argv)
         StringToUInt(argv[2], y);
     }
     
+    #ifdef DEBUG
+        system("rm -f food.pos");
+        system("rm -f debug_log");
+    #endif
+       
     CSimpleSnake simpledemo;
     
     simpledemo.Init(x, y);

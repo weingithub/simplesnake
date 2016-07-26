@@ -77,11 +77,13 @@ private:
     TPos      m_scorePos;  
     TPos      m_levelPos;
     TPos      m_NextPos;   //记录下次过关所需分数
+    TPos      m_DebugPos;   //debug信息打印的位置
     
     uint32_t  m_score;
     uint32_t  m_level;
     uint32_t  m_exp;  //每个食物代表的分数
     
+    bool    m_isAllowChange;
     std::list<TPos>  m_snakebody;
 };
 

@@ -116,7 +116,9 @@ int Common::GetRandomValue(int max)
     }
     
     //先设置随机数种子
-    srand((unsigned)time(0));
+    int random_seed = rand()% max;
+    
+    srand((unsigned)time(0) + random_seed);
     
     int random = rand()% max;
     
